@@ -27,7 +27,7 @@ public class EntityManager <E> implements DatabaseContext <E> {
         idColumn.setAccessible(true);
         Object idValue = idColumn.get(entity);
 
-        if (idValue == null ) {
+        if (idValue == null || (long) idValue ==0 ) {
             return doInsert(entity);
         }
         return doUpdate(entity, idColumn, idValue);
