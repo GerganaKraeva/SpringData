@@ -10,7 +10,7 @@ import java.time.LocalDate;
 public class Order {
     @Id
     @Column(name = "id")
-    private int id;
+    private long id;
 
     @Column(name = "number")
     private  String number;

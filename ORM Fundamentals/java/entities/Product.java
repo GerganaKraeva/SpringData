@@ -1,8 +1,20 @@
 package entities;
 
+import orm.annotations.Column;
+import orm.annotations.Entity;
+import orm.annotations.Id;
+
+@Entity(name = "products")
 public class Product {
-    private  int id;
+
+    @Id
+    @Column(name ="id")
+    private  long id;
+
+    @Column(name ="name")
     private String name;
+
+    @Column(name ="price")
     private double price;
 
     public Product(){}
@@ -12,7 +24,7 @@ public class Product {
         this.price = price;
     }
 
-    public int getId() {
+    public long getId() {
         return id;
     }
 
