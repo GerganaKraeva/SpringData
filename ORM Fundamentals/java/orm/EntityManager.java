@@ -9,12 +9,20 @@ import java.lang.reflect.InvocationTargetException;
 import java.sql.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
-public class EntityManager <E> implements DatabaseContext <E> {
+public class EntityManager<E> implements DatabaseContext<E> {
     private static final String INSERT_TEMPLATE = "INSERT INTO %s (%s) VALUES (%s)";
     private static final String UPDATE_WITH_WHERE_TEMPLATE = "UPDATE %s SET %s WHERE %s";
     private static final String SELECT_WITH_WHERE_PLACEHOLDER_TEMPLATE = "SELECT %s FROM %s %s";
+
+    private static final String CREATE_TABLE_TEMPLATE = "CREATE TABLE %s(%s)";
+
+    private static final String ALTER_TABLE_TEMPLATE = "ALTER TABLE %s %s";
+
+    private static final String EXISTING_COLUMN_SQL = "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'mini_orm' AND TABLE_NAME = ?";
     private final Connection connection;
 
     public EntityManager(Connection connection) {
@@ -22,12 +30,94 @@ public class EntityManager <E> implements DatabaseContext <E> {
     }
 
     @Override
-    public boolean persist(E entity) throws SQLException, IllegalAccessException,ClassCastException {
+    public boolean delete(E entity) throws SQLException, IllegalAccessException {
+        PreparedStatement preparedStatement = this.connection.prepareStatement(String.format("DELETE FROM %s WHERE id =?",getTableName(entity)));
+        Field fieldId = Arrays.stream(entity.getClass().getDeclaredFields()).filter(f -> f.getName().equals("id")).findFirst().get();
+        fieldId.setAccessible(true);
+        long id = fieldId.getLong(entity);
+        preparedStatement.setLong(1,id);
+        int deletedRows=preparedStatement.executeUpdate();
+
+        if(deletedRows == 0) {
+            System.out.println("No rows deleted.");
+            return false;
+        } else {
+            System.out.println(deletedRows+" rows deleted from table");
+            return true;
+        }
+    }
+
+    @Override
+    public void doAlter(E entity) throws SQLException {
+        String newColumns = getColumnsThatNotExist(entity);
+        String sql = String.format(ALTER_TABLE_TEMPLATE, getTableName(entity), "");
+        this.connection.prepareStatement(sql).execute();
+    }
+
+    private String getColumnsThatNotExist(E entity) throws SQLException {
+        List<String> existingColumns = getExistingColumns(entity);
+        return Arrays.stream(entity.getClass().getDeclaredFields())
+                .filter(f -> !existingColumns.contains(f.getAnnotation(Column.class).name()))
+                .map(f -> String.format("%s %s", getFieldName(f), getFieldType(f)))
+                .collect(Collectors.joining(", "));
+    }
+
+
+    private List<String> getExistingColumns(E entity) throws SQLException {
+        List<String> existingColumns = new ArrayList<>();
+        String sql = EXISTING_COLUMN_SQL;
+        PreparedStatement preparedStatement = connection.prepareStatement("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'mini_orm' AND TABLE_NAME = ? ");
+        preparedStatement.setString(1, getTableName(entity));
+        ResultSet resultSet = preparedStatement.executeQuery();
+        while (resultSet.next()) {
+            existingColumns.add(resultSet.getString(1));
+        }
+        return existingColumns;
+    }
+
+    @Override
+    public void doCreate(Class<E> entityClass) throws SQLException {
+        String tableName = getTableName(entityClass);
+        String sql = String.format(CREATE_TABLE_TEMPLATE, tableName, getAllFieldsAndDataTypes(entityClass));
+        this.connection.prepareStatement(sql).execute();
+    }
+
+    private Object getAllFieldsAndDataTypes(Class<E> entityClass) {
+        List<String> dbColumns = new ArrayList<>();
+        Field[] declaredFields = entityClass.getDeclaredFields();
+        for (Field declaredField : declaredFields) {
+
+            StringBuilder sb = new StringBuilder(String.format("%s %s", getFieldName(declaredField), getFieldType(declaredField)));
+            if (declaredField.isAnnotationPresent(Id.class)) {
+                sb.append(" PRIMARY KEY AUTO_INCREMENT");
+            }
+            dbColumns.add(sb.toString());
+        }
+        return String.join(", ", dbColumns);
+    }
+
+    private String getFieldName(Field declaredField) {
+        return declaredField.getAnnotation(Column.class).name();
+    }
+
+    private String getFieldType(Field declaredField) {
+        return switch (declaredField.getType().getSimpleName()) {
+            case "int", "Integer" -> "INT";
+            case "long", "Long" -> "BIGINT";
+            case "String" -> "VARCHAR(255)";
+            case "double", "Double" -> "DOUBLE";
+            case "LocalDate" -> "DATE";
+            default -> "";
+        };
+    }
+
+    @Override
+    public boolean persist(E entity) throws SQLException, IllegalAccessException, ClassCastException {
         Field idColumn = getIdColumn(entity);
         idColumn.setAccessible(true);
         Object idValue = idColumn.get(entity);
 
-        if (idValue == null || (long) idValue ==0 ) {
+        if (idValue == null || (long) idValue == 0) {
             return doInsert(entity);
         }
         return doUpdate(entity, idColumn, idValue);
@@ -45,11 +135,11 @@ public class EntityManager <E> implements DatabaseContext <E> {
             columnsWithValues.add(s);
         }
 
-        String idCondition = String.format("%s=%s", idColumn.getName(), idValue.toString());
+        String idCondition = String.format("ADD COLUMN %s=%s", idColumn.getName(), idValue.toString());
 
         String updateQuery = String.format(UPDATE_WITH_WHERE_TEMPLATE,
                 tableName,
-                String.join(",",columnsWithValues),
+                String.join(",", columnsWithValues),
                 idCondition);
         PreparedStatement statement = connection.prepareStatement(updateQuery);
         int updateCount = statement.executeUpdate();
@@ -65,7 +155,7 @@ public class EntityManager <E> implements DatabaseContext <E> {
         String formattedInsert = String.format(INSERT_TEMPLATE,
                 tableName,
                 String.join(",", columnsList),
-                String.join(",",values));
+                String.join(",", values));
 
         PreparedStatement statement = connection.prepareStatement(formattedInsert);
         int changedRows = statement.executeUpdate();
@@ -90,9 +180,9 @@ public class EntityManager <E> implements DatabaseContext <E> {
 
     @Override
     public E findFirst(Class<E> table, String where) throws SQLException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
-        List <E> result = baseFind(table, where,1);
+        List<E> result = baseFind(table, where, 1);
 
-        if(result.isEmpty()) {
+        if (result.isEmpty()) {
             return null;
         }
         return result.get(0);
@@ -119,6 +209,7 @@ public class EntityManager <E> implements DatabaseContext <E> {
         }
         return result;
     }
+
     private E generatedEntity(Class<E> table, ResultSet resultSet) throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException, SQLException {
         E result = table.getDeclaredConstructor().newInstance();
 

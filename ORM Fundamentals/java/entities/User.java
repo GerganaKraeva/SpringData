@@ -5,23 +5,28 @@ import orm.annotations.Entity;
 import orm.annotations.Id;
 
 import java.time.LocalDate;
+
 @Entity(name = "users")
 public class User {
 
     @Id
-    @Column(name ="id")
+    @Column(name = "id")
     private long id;
 
-    @Column(name ="username")
+    @Column(name = "username")
     private String username;
 
-    @Column(name ="age")
+    @Column(name = "age")
     private int age;
 
-    @Column(name ="registration")
+    @Column(name = "registration")
     private LocalDate registration;
 
-    public User(){}
+    @Column(name = "email")
+    private String email;
+
+    public User() {
+    }
 
     public User(String username, int age, LocalDate registration) {
         this.username = username;
@@ -29,9 +34,18 @@ public class User {
         this.registration = registration;
     }
 
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
     public long getId() {
         return id;
     }
+
     public String getUsername() {
         return username;
     }
@@ -39,7 +53,6 @@ public class User {
     public int getAge() {
         return age;
     }
-
 
 
     public LocalDate getRegistration() {
