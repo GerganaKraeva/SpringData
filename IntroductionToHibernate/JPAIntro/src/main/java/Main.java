@@ -11,9 +11,11 @@ public class Main {
         EntityManager entityManager = emf.createEntityManager();
         entityManager.getTransaction().begin();
 
-        Teacher teacher=new Teacher();
-        teacher.setName("Geri");
-        entityManager.persist(teacher);
+//        Teacher teacher=new Teacher();
+//        teacher.setName("Geri");
+//        entityManager.persist(teacher);
+        Teacher teacherFromDB=entityManager.find(Teacher.class, 3);
+        System.out.println(teacherFromDB);
 
         entityManager.getTransaction().commit();
     }
