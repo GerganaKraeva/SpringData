@@ -10,6 +10,7 @@ import javax.persistence.criteria.CriteriaBuilder;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -22,9 +23,71 @@ public class Main {
         EntityManager entityManager = entityManagerFactory.createEntityManager();
         entityManager.getTransaction().begin();
 
-        task8(entityManager);
+        task12(entityManager);
 
         entityManager.getTransaction().commit();
+    }
+
+    private static void task12(EntityManager entityManager) throws IOException {
+        List<Town> resultList = entityManager.createQuery("FROM Town WHERE name = :name", Town.class)
+                .setParameter("name",READER.readLine())
+                .getResultList();
+        if(!resultList.isEmpty()){
+            Town town=resultList.get(0);
+            List<Address> addresses = entityManager.createQuery("SELECT a FROM Address a JOIN a.town t WHERE t.name = :name", Address.class)
+                    .setParameter("name", town.getName())
+                    .getResultList();
+            addresses.forEach(a->{
+                a.getEmployees().forEach(e-> {
+                    e.setAddress(null);
+                    entityManager.persist(e);
+                });
+                entityManager.remove(a);
+            });
+
+            System.out.printf("%d addresses in %s deleted", addresses.size(), town.getName());
+            entityManager.remove(town);
+        }
+
+    }
+
+    private static void task11(EntityManager entityManager) {
+        entityManager.createQuery("SELECT department.name, max(salary)" +
+                        " FROM Employee " +
+                        " GROUP BY department.name" +
+                        " HAVING max(salary) NOT BETWEEN 30000 AND 70000", Object[].class)
+                .getResultList()
+                .forEach(objects -> System.out.println(objects[0] + " " + objects[1]));
+
+    }
+
+    private static void task10(EntityManager entityManager) throws IOException {
+        String userInput = READER.readLine();
+        List<Employee> resultList = entityManager.createQuery("FROM Employee WHERE firstName LIKE CONCAT(?1, '%')", Employee.class)
+                .setParameter(1, userInput)
+                .getResultList();
+//        List<Employee> resultList = entityManager.createQuery("FROM Employee WHERE firstName LIKE CONCAT(:letters, '%')", Employee.class)
+//                .setParameter("letters", userInput)
+//                .getResultList();
+        if (!resultList.isEmpty()) {
+            resultList.forEach(e -> System.out.printf("%s %s - %s - ($%.2f)%n",
+                    e.getFirstName(),
+                    e.getLastName(),
+                    e.getJobTitle(),
+                    e.getSalary()));
+        }
+    }
+
+
+    private static void task9(EntityManager entityManager) {
+        List<Employee> resultList = entityManager.createQuery("SELECT e FROM Employee AS e JOIN e.department AS d " +
+                "WHERE d.name IN ('Engineering', 'Tool Design', 'Marketing', 'Information Services')", Employee.class).getResultList();
+
+        for (Employee employee : resultList) {
+            employee.setSalary(employee.getSalary().multiply(BigDecimal.valueOf(1.12)));
+            entityManager.persist(employee);
+            System.out.printf("%s %s ($%.2f)%n", employee.getLastName(), employee.getLastName(), employee.getSalary());
+        }
     }
 
     private static void task8(EntityManager entityManager) {
