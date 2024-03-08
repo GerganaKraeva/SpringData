@@ -14,4 +14,8 @@ public interface AuthorService {
     List<String> getAllAuthorsFirstAndLastNameForBooksBeforeYear1990();
 
     List<String> getAllAuthorsDescBooks();
+
+    List<Author> getAllAuthorsFirstNameEndsWith(String string);
+
+    int getTotalCopiesCountFor(String firstName, String secondName);
 }
