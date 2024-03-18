@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8">
+<person>
+    <phoneNumbers>
+        <phoneNumber>
+            <number>08983248798</number>
+        </phoneNumber>
+        <phoneNumber>
+            <number>08983243143</number>
+        </phoneNumber>
+    </phoneNumbers>
+</person>
